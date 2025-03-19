@@ -2,11 +2,11 @@ module Mux_32to1 (
     I, OpCode, Y
 );
     input [31:0] I;
-    input [4:0] OpCode;
+    input [4:0] Sel;
     output reg Y;
 
     always @(*) begin
-        case(OpCode)
+        case(Sel)
             5'b00000: Y = I[0];
             5'b00001: Y = I[1];
             5'b00010: Y = I[2];
