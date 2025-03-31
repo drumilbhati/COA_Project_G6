@@ -37,4 +37,5 @@ always @(posedge clk) begin
     Source1 <= Dataout[15:12];
     Source2 <= Dataout[11:8];
     Imm <= Dataout[7:0];
+end
 endmodule
