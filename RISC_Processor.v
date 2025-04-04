@@ -55,7 +55,7 @@ module RISCprocessor(
     );
 
         // * Program Counter:
-    Mux32to1_8bit Mux32to1_8bit_PCInst(
+    Mux32to1_8bitRP Mux32to1_8bit_PCInst(
         Opcode,
         PC,
         PC,
@@ -116,7 +116,7 @@ module RISCprocessor(
         .Imm(Imm)
     );
     // * Register File
-    Mux32to1_8bit Mux32to1_8bit_RegInst(
+    Mux32to1_8bitRP Mux32to1_8bit_RegInst(
         Opcode,
         RegDatain,
         RegDatain,
@@ -167,7 +167,7 @@ module RISCprocessor(
         .Dataout2(RegDataout2)
     );
      // * ALU
-    Mux32to1_8bit Mux32to1_8bit_ALU_OP1Inst(
+    Mux32to1_8bitRP Mux32to1_8bit_ALU_OP1Inst(
         Opcode,
         8'b0,
         8'b0,
@@ -203,7 +203,7 @@ module RISCprocessor(
         8'b0,
         Operand1
     );
-    Mux32to1_8bit Mux32to1_8bit_ALU_OP2Inst(
+    Mux32to1_8bitRP Mux32to1_8bit_ALU_OP2Inst(
         Opcode,
         8'b0,
         8'b0,
@@ -256,7 +256,7 @@ module RISCprocessor(
     );
     
      // * SRAM
-    Mux32to1_8bit Mux32to1_8bit_SRAMInst(
+    Mux32to1_8bitRP Mux32to1_8bit_SRAMInst(
         Opcode,
         SRAMAddress,
         SRAMAddress,
