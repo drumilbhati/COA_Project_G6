@@ -1,41 +1,45 @@
 module inst_mem(
-clk,
-Reset,
-Address,
-instRead
-Dataout,
-opcode,
-Destin,
-Source1,
-Source2,
-Imm
+    input clk,
+    input Reset,
+    input [7:0] Address,
+    input instRead,
+    output reg [24:0] Dataout,
+    output reg [4:0] opcode,
+    output reg [3:0] Destin, Source1, Source2,
+    output reg [8:0] Imm
 );
-input clk, Reset, instRead;
-input [7:0] Address;
-output [24:0] Dataout;
-output [4:0] opcode, ;
-output [3:0] Destin, Source1, Source2;
-output [7:0] Imm;
-wire rom_out [24:0];
-ROM inst1(Address, rom_out);
-always @(posedge clk or posedge Reset) begin
-    if (Reset) begin
-        Dataout <= 25'b0;
-        Data_1 <= 25'b0;
-        Data_2 <= 25'b0;
-        Data_3 <= 25'b0;
-    end else if (instRead) begin
-        Dataout <= rom_out;
-        Data_1 <= rom_out[24:20];
-        Data_2 <= rom_out[19:16];
-        Data_3 <= rom_out[15:12];
+
+    wire [24:0] rom_out;
+    wire [4:0] rom_opcode;
+    wire [3:0] rom_Destin, rom_Source1, rom_Source2;
+    wire [8:0] rom_Imm;
+    
+    ROM inst1(
+        .Address(Address),
+        .Dataout(rom_out),
+        .Opcode(rom_opcode),
+        .Destin(rom_Destin),
+        .Source1(rom_Source1),
+        .Source2(rom_Source2),
+        .Imm(rom_Imm)
+    );
+
+    always @(posedge clk or posedge Reset) begin
+        if (Reset) begin
+            Dataout <= 25'b0;
+            opcode  <= 5'b0;
+            Destin  <= 4'b0;
+            Source1 <= 4'b0;
+            Source2 <= 4'b0;
+            Imm     <= 9'b0;
+        end else if (instRead) begin
+            Dataout <= rom_out;
+            opcode  <= rom_opcode;
+            Destin  <= rom_Destin;
+            Source1 <= rom_Source1;
+            Source2 <= rom_Source2;
+            Imm     <= rom_Imm;
+        end
     end
-end
-always @(posedge clk) begin
-    opcode <= Dataout[24:20];
-    Destin <= Dataout[19:16];
-    Source1 <= Dataout[15:12];
-    Source2 <= Dataout[11:8];
-    Imm <= Dataout[7:0];
-end
+
 endmodule
