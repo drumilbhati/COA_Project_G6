@@ -46,7 +46,7 @@ module RISCprocessor(
     wire Zflag, Cflag;;
     
     // Instantiate modules
-    ProgCounter PC_Module(
+    Program_Counter PC_Module(
         .clk(clk),
         .Reset(Reset),
         .PCenable(1'b1),
@@ -56,7 +56,7 @@ module RISCprocessor(
         .PC_D2(PC_D2)
     );
     
-    InstMEM Inst_Memory(
+    Instruction_Memory Inst_Memory(
         .clk(clk),
         .Reset(Reset),
         .Address(currentInstruction),
@@ -69,7 +69,7 @@ module RISCprocessor(
         .Imm(Imm)
     );
     
-    RegisterFile Reg_File(
+    registerfile Reg_File(
         .clk(clk),
         .Reset(Reset),
         .RegFileRead(RegfileRead),
@@ -118,7 +118,7 @@ module RISCprocessor(
         .Regfilewrite(Regfilewrite)
     );
     
-    INport Input_Module(
+    INPort Input_Module(
         .clk(clk),
         .Reset(Reset),
         .INportRead(INportRead),
@@ -128,7 +128,7 @@ module RISCprocessor(
         .InpExtWorld4(InpExtWorld4)
     );
     
-    OUTport Output_Module(
+    OUTPort Output_Module(
         .clk(clk),
         .Reset(Reset),
         .OUTportWrite(OutportWrite),
