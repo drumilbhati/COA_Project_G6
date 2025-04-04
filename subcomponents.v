@@ -158,7 +158,7 @@ module ALU(
 endmodule
 module Control_Logic(clk, Reset, T1, T2, T3, T4, Zflag, PC_Update, SRam_R, SRam_W,Cflag,opcode, StackRead, StackWrite, ALU_Save,ZFlag_Save,CFlag_Save,INportRead, OutportWrite, RegfileRead, Regfilewrite);
 input clk, Reset, T1, T2, T3, T4, Zflag, Cflag;
-input [4:0] opcode;
+input wire [4:0] opcode;
 output wire StackRead, StackWrite, ALU_Save, ZFlag_Save, CFlag_Save, INportRead, OutportWrite, RegfileRead, Regfilewrite, PC_Update, SRam_R, SRam_W;
 wire [31:0] I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12;
 assign I1=32'b00000000100000000001000000000000; // 0x00801000
@@ -392,13 +392,13 @@ module Instruction_Memory(
     output reg [24:0] Dataout,
     output reg [4:0] opcode,
     output reg [3:0] Destin, Source1, Source2,
-    output reg [8:0] Imm
+    output reg [7:0] Imm
 );
 
     wire [24:0] rom_out;
     wire [4:0] rom_opcode;
     wire [3:0] rom_Destin, rom_Source1, rom_Source2;
-    wire [8:0] rom_Imm;
+    wire [7:0] rom_Imm;
     
     ROM inst1(
         .Address(Address),
@@ -433,7 +433,7 @@ module Mux_2to1(I0,I1,Sel,Y);
 input [7:0] I1;
 input[7:0] I0; 
 input Sel;
-output[7:0] Y;
+output reg[7:0] Y;
 always @(*)begin
     case(Sel)
     1'b1: Y=I1;
@@ -508,11 +508,11 @@ module Mux_32to1 (
     I, OpCode, Y
 );
     input [31:0] I;
-    input [4:0] Sel;
+    input [4:0] OpCode;
     output reg Y;
 
     always @(*) begin
-        case(Sel)
+        case(OpCode)
             5'b00000: Y = I[0];
             5'b00001: Y = I[1];
             5'b00010: Y = I[2];
@@ -550,16 +550,17 @@ module Mux_32to1 (
     end
 endmodule
 module Mux_32to1withE (
-    I, OpCod0e,E, Y
+    I, OpCode,E, Y
 );
     input [31:0] I;
     input E;
-    input [4:0] Sel;
+    
+    input [4:0] OpCode;
     output reg Y;
 
     always @(*) begin
         if (E) begin
-        case(Sel)
+        case(OpCode)
             5'b00000: Y = I[0];
             5'b00001: Y = I[1];
             5'b00010: Y = I[2];
@@ -633,7 +634,7 @@ module OUTPort (
 
 endmodule
 module Program_Counter(Enable_PC,Reset, Update_PC, clk, New_Address, PC, PC_D2);
-input Enable_PC, Update_PC, clk;
+input Enable_PC, Update_PC, clk, Reset;
 input[7:0] New_Address;
 output[7:0] PC;
 output[7:0] PC_D2;
@@ -694,7 +695,7 @@ module ROM(
     output reg [3:0] Destin,
     output reg [3:0] Source1,
     output reg [3:0] Source2,
-    output reg [8:0] Imm
+    output reg [7:0] Imm
 );
     
     reg [24:0] memory [0:255];

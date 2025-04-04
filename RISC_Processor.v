@@ -10,7 +10,7 @@ module RISCprocessor(
     output [7:0] OutExtWorld3,
     output [7:0] OutExtWorld4
 );
-    wire [7:0] RegDataout1, RegDataout2;
+    wire [7:0] RegDataout1, RegDataout2, RegDatain;
     // * instruction memory
     wire [4:0] Opcode;
     wire [3:0] Source1, Source2, Destin;
@@ -96,9 +96,9 @@ module RISCprocessor(
     Program_Counter PC_Module(
         .clk(clk),
         .Reset(Reset),
-        .PCenable(1'b1),
-        .PCupdate(PCupdate),
-        .CAddress(PCAddress),
+        .Enable_PC(T0),
+        .Update_PC(PCupdate),
+        .New_Address(PCAddress),
         .PC(PC),
         .PC_D2(PC_D2)
     );
@@ -106,10 +106,10 @@ module RISCprocessor(
     Instruction_Memory Inst_Memory(
         .clk(clk),
         .Reset(Reset),
-        .Address(currentInstruction),
-        .InstRead(T0),
-        .Dataout(InstOut),
-        .Opcode(Opcode),
+        .Address(PC),
+        .instRead(T0),
+        .Dataout(currentInstruction),
+        .opcode(Opcode),
         .Destin(Destin),
         .Source1(Source1),
         .Source2(Source2),
@@ -156,13 +156,13 @@ module RISCprocessor(
     
     registerfile Reg_File(
         .clk(clk),
-        .Reset(Reset),
-        .RegFileRead(RegfileRead),
-        .RegFileWrite(Regfilewrite),
-        .Datain(ALUout),
-        .Source1(Source1),
-        .Source2(Source2),
-        .Destin(Destin),
+        .Rst(Reset),
+        .R(RegfileRead),
+        .W(Regfilewrite),
+        .Datain(RegDatain),
+        .AddressR1(Source1),
+        .AddressR2(Source2),
+        .AddressW(Destin),
         .Dataout1(RegDataout1),
         .Dataout2(RegDataout2)
     );
@@ -243,16 +243,13 @@ module RISCprocessor(
     ALU ALU_Module(
         .clk(clk),
         .Reset(Reset),
-        .Imm7(Imm),
-        .Operand1(Dataout1),
-        .Operand2(Dataout2),
-        .Opcode(Opcode),
-        .ALUSave(ALUSave),
-        .ZflagSave(ZflagSave),
-        .CflagSave(CflagSave),
-        .Zflag(Zflag),
-        .Cflag(Cflag),
-        .ALUout(ALUout)
+        .Imm7(Imm[7]),
+        .Op1(RegDataout1),
+        .Op2(RegDataout2),
+        .OpCode(Opcode),
+        .ZFlag_Save(ZflagSave),
+        .CFlag_Save(CflagSave),
+        .ALU_Save(ALUout)
     );
     
      // * SRAM
@@ -326,7 +323,7 @@ module RISCprocessor(
     INPort Input_Module(
         .clk(clk),
         .Reset(Reset),
-        .INportRead(INportRead),
+        .INPortRead(INportRead),
         .InpExtWorld1(InpExtWorld1),
         .InpExtWorld2(InpExtWorld2),
         .InpExtWorld3(InpExtWorld3),
@@ -336,7 +333,7 @@ module RISCprocessor(
     OUTPort Output_Module(
         .clk(clk),
         .Reset(Reset),
-        .OUTportWrite(OutportWrite),
+        .OUTportWrite(OutPortWrite),
         .Datain(ALUout),
         .OutExtWorld1(OutExtWorld1),
         .OutExtWorld2(OutExtWorld2),
