@@ -19,16 +19,16 @@ module RISCprocessor(
     wire [7:0] Imm;
     wire [7:0] Dataout1, Dataout2;
     wire [7:0] ALUout;
-    wire ALUSave, ZflagSave, CflagSave, Zflag, Cflag;
-    wire SRAMRead, SRAMWrite, StackRead, StackWrite;
-    wire RegFileRead, RegFileWrite, INportRead, OUTportWrite;
+    wire ALU_Save, ZFlag_Save, CFlag_Save, Zflag, Cflag;
+    wire PC_Update, SRam_R, SRam_W, StackRead, StackWrite;
+    wire RegfileRead, Regfilewrite, INportRead, OutportWrite;
     
     // Instantiate modules
     ProgCounter PC_Module(
         .clk(clk),
         .Reset(Reset),
         .PCenable(1'b1),
-        .PCupdate(PCupdate),
+        .PCupdate(PC_Update),
         .CAddress(CAddress),
         .PC(PC),
         .PC_D2(PC_D2)
@@ -50,8 +50,8 @@ module RISCprocessor(
     RegisterFile Reg_File(
         .clk(clk),
         .Reset(Reset),
-        .RegFileRead(RegFileRead),
-        .RegFileWrite(RegFileWrite),
+        .RegFileRead(RegfileRead),
+        .RegFileWrite(Regfilewrite),
         .Datain(ALUout),
         .Source1(Source1),
         .Source2(Source2),
@@ -67,28 +67,33 @@ module RISCprocessor(
         .Operand1(Dataout1),
         .Operand2(Dataout2),
         .Opcode(Opcode),
-        .ALUSave(ALUSave),
-        .ZflagSave(ZflagSave),
-        .CflagSave(CflagSave),
+        .ALUSave(ALU_Save),
+        .ZflagSave(ZFlag_Save),
+        .CflagSave(CFlag_Save),
         .Zflag(Zflag),
         .Cflag(Cflag),
         .ALUout(ALUout)
     );
     
-    ControlLogic Ctrl_Logic(
+    Control_Logic Ctrl_Logic(
         .clk(clk),
         .Reset(Reset),
-        .Opcode(Opcode),
+        .T1(1'b1), .T2(1'b1), .T3(1'b1), .T4(1'b1),
         .Zflag(Zflag),
         .Cflag(Cflag),
-        .RegFileRead(RegFileRead),
-        .RegFileWrite(RegFileWrite),
-        .SRAMRead(SRAMRead),
-        .SRAMWrite(SRAMWrite),
+        .opcode(Opcode),
+        .PC_Update(PC_Update),
+        .SRam_R(SRam_R),
+        .SRam_W(SRam_W),
         .StackRead(StackRead),
         .StackWrite(StackWrite),
+        .ALU_Save(ALU_Save),
+        .ZFlag_Save(ZFlag_Save),
+        .CFlag_Save(CFlag_Save),
         .INportRead(INportRead),
-        .OUTportWrite(OUTportWrite)
+        .OutportWrite(OutportWrite),
+        .RegfileRead(RegfileRead),
+        .Regfilewrite(Regfilewrite)
     );
     
     INport Input_Module(
@@ -104,7 +109,7 @@ module RISCprocessor(
     OUTport Output_Module(
         .clk(clk),
         .Reset(Reset),
-        .OUTportWrite(OUTportWrite),
+        .OUTportWrite(OutportWrite),
         .Datain(ALUout),
         .OutExtWorld1(OutExtWorld1),
         .OutExtWorld2(OutExtWorld2),
