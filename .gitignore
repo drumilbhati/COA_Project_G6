@@ -1,0 +1,8 @@
+# Simulation output files
+Wavedump.vcd
+RISC_Processor.vvp
+
+# Additional common Verilog output files
+*.vcd
+*.vvp
+*.out
