@@ -53,7 +53,7 @@ module full_adder(A, B, Cin, S, Cout);
  	
   assign S = tempOut1[1] | tempOut1[2] | tempOut1[4] | tempOut1[7];
   
-  mux8to1_withoutE inst2(8'b10010110, tempA, Cout);
+  mux8to1_withoutE inst2(8'b11101000, tempA, Cout);
 endmodule
 
 // Structural modelling_04 //
@@ -141,7 +141,7 @@ module ALU(
     assign RShift = Op1 >> {Op2[2], Op2[1], Op2[0]};
 
     // Result selection
-    Mux32to1_8bit inst3(OpCode, 
+    Mux32to1_8bitRP inst3(OpCode, 
         8'b0, 8'b0, 8'b0, Sum, Sum, LShift, RShift, Sum, 
         Sum, 8'b0, Sum, 8'b0, 8'b0, Sum, 8'b0, 8'b0, 
         8'b0, 8'b0, 8'b0, Sum, 8'b0, Sum, Sum, Sum, 
