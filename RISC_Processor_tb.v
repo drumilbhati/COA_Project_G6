@@ -1,15 +1,19 @@
-`timescale 1ns / 1ps
+`timescale 1ns/1ps
 
 module RISCprocessor_tb;
-
     // Testbench signals
     reg clk;
     reg Reset;
     reg [7:0] InpExtWorld1, InpExtWorld2, InpExtWorld3, InpExtWorld4;
     wire [7:0] OutExtWorld1, OutExtWorld2, OutExtWorld3, OutExtWorld4;
 
-    // Instantiate the DUT (Device Under Test)
-    RISCprocessor uut (
+    // Debug signals
+    wire [7:0] PC;
+    wire [24:0] Instruction;
+    wire [4:0] Opcode;
+
+    // Instantiate the DUT
+    RISCprocessor processor (
         .clk(clk),
         .Reset(Reset),
         .InpExtWorld1(InpExtWorld1),
@@ -23,39 +27,42 @@ module RISCprocessor_tb;
     );
 
     // Clock generation
-    always #5 clk = ~clk; // 10ns clock period
-
-    initial begin
-        // Initialize inputs
-        clk = 0;
-        Reset = 1;
-        InpExtWorld1 = 8'b00000000;
-        InpExtWorld2 = 8'b00000000;
-        InpExtWorld3 = 8'b00000000;
-        InpExtWorld4 = 8'b00000000;
-        
-        // Reset pulse
-        #10 Reset = 0;
-        #10 Reset = 1;
-        #10 Reset = 0;
-        
-        // Apply test stimulus
-        #20 InpExtWorld1 = 8'b10101010;
-        #20 InpExtWorld2 = 8'b11001100;
-        #20 InpExtWorld3 = 8'b11110000;
-        #20 InpExtWorld4 = 8'b00001111;
-        
-        // Observe the outputs
-        #100;
-
-        // Finish simulation
-        $stop;
+    always begin
+        #10 clk = ~clk;
     end
-    
-    // Monitor outputs
+
+    // Initialize and monitor
     initial begin
-        $monitor("Time=%0t | OutExtWorld1=%b OutExtWorld2=%b OutExtWorld3=%b OutExtWorld4=%b", 
-                 $time, OutExtWorld1, OutExtWorld2, OutExtWorld3, OutExtWorld4);
+        // Initialize signals
+        clk = 1'b0;
+        Reset = 1'b1;
+        InpExtWorld1 = 8'h00;
+        InpExtWorld2 = 8'h00;
+        InpExtWorld3 = 8'h00;
+        InpExtWorld4 = 8'h00;
+
+        // Set up waveform dumping
+        $dumpfile("Wavedump.vcd");
+        $dumpvars(0, RISCprocessor_tb);
+
+        // Hold reset for 50ns
+        #50 Reset = 1'b0;
+
+        // Run until timeout or completion
+        #5000;
+        
+        $display("Simulation completed");
+        $finish;
+    end
+
+    // Timeout checker
+    integer cycle_count = 0;
+    always @(posedge clk) begin
+        cycle_count <= cycle_count + 1;
+        if (cycle_count >= 500) begin  // Adjust timeout as needed
+            $display("\nTimeout after %d cycles", cycle_count);
+            $finish;
+        end
     end
 
 endmodule

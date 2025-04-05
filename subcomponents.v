@@ -1,3 +1,5 @@
+`timescale 1ns/100ps
+
 // Dataflow modelling_01 //
 module decoder3to8_withoutE(A,D);
   input [2:0] A;
@@ -116,45 +118,48 @@ endmodule
 module ALU(
     input clk,
     input Reset,
-    input Imm7,                   // Immediate flag
-    input [4:0] OpCode,           // Operation code
-    input [7:0] Op1, Op2,         // Operands
-    output reg ZFlag_Save,        // Zero flag
-    output reg CFlag_Save,        // Carry flag
-    output reg [7:0] ALU_Save     // ALU result
+    input ALUSave,              
+    input Imm7,                 
+    input [4:0] OpCode,         
+    input [7:0] Op1, Op2,      
+    output wire Zflag,         
+    output wire Cflag,         
+    output wire [7:0] ALUout
 );
+    wire M, Cout, temp, carryFlagValue;
+    wire [7:0] Sum, Or, And, Xor, LShift, RShift, selectedAns;
 
-    reg [8:0] temp_result;        // Temporary register to hold results with carry
+    // Determine operation type
+    Mux32to1_1bit_withoutE inst1(OpCode, {3'b0, Imm7, Imm7, 2'b0, 1'b1, 24'b0}, M);
+    
+    // ALU operations
+    adder_subtractor inst2(Op1, Op2, M, Sum, Cout, temp);
+    assign Or = Op1 | Op2;
+    assign And = Op1 & Op2;
+    assign Xor = Op1 ^ Op2;
+    assign LShift = Op1 << {Op2[2], Op2[1], Op2[0]};
+    assign RShift = Op1 >> {Op2[2], Op2[1], Op2[0]};
 
-    always @(posedge clk or posedge Reset) begin
-        if (Reset) begin
-            ALU_Save   <= 8'b0;
-            ZFlag_Save <= 1'b0;
-            CFlag_Save <= 1'b0;
-        end else begin
-            case (OpCode)
-                5'b00000: temp_result = Op1 + Op2;      // Addition
-                5'b00001: temp_result = Op1 - Op2;      // Subtraction
-                5'b00010: temp_result = Op1 & Op2;      // Bitwise AND
-                5'b00011: temp_result = Op1 | Op2;      // Bitwise OR
-                5'b00100: temp_result = Op1 ^ Op2;      // Bitwise XOR
-                5'b00101: temp_result = Op1 << 1;       // Left Shift
-                5'b00110: temp_result = Op1 >> 1;       // Right Shift
-                5'b00111: temp_result = ~Op1;           // Bitwise NOT
-                5'b01000: temp_result = (Op1 < Op2) ? 8'b1 : 8'b0; // Comparison
-                default:  temp_result = 8'b0;           // Default case
-            endcase
+    // Result selection
+    Mux32to1_8bit inst3(OpCode, 
+        8'b0, 8'b0, 8'b0, Sum, Sum, LShift, RShift, Sum, 
+        Sum, 8'b0, Sum, 8'b0, 8'b0, Sum, 8'b0, 8'b0, 
+        8'b0, 8'b0, 8'b0, Sum, 8'b0, Sum, Sum, Sum, 
+        Xor, Or, And, Sum, Xor, Or, And, Sum, selectedAns);
 
-            // Assign final result
-            ALU_Save <= temp_result[7:0];
+    // Carry flag logic
+    Mux32to1_1bit_withoutE inst4(OpCode, 
+        {{5{1'b0}}, Op1[7], Op1[0], Cout, {15{1'b0}}, Cout, {3{1'b0}}, Cout, {4{1'b0}}}, 
+        carryFlagValue);
 
-            // Zero Flag: Set if result is zero
-            ZFlag_Save <= (temp_result[7:0] == 8'b0) ? 1'b1 : 1'b0;
+    // Output registers with original names
+    eightbitRegwithLoad inst5(clk, Reset, ALUSave, selectedAns, ALUout);
+    onebitRegwithLoad inst6(clk, Reset, ALUSave, carryFlagValue, Cflag);
+    onebitRegwithLoad inst7(clk, Reset, ALUSave, 
+        ~(selectedAns[7] | selectedAns[6] | selectedAns[5] | selectedAns[4] | 
+          selectedAns[3] | selectedAns[2] | selectedAns[1] | selectedAns[0]), 
+        Zflag);
 
-            // Carry Flag: Set if overflow occurs
-            CFlag_Save <= temp_result[8];  // 9th bit indicates carry
-        end
-    end
 endmodule
 module Control_Logic(clk, Reset, T1, T2, T3, T4, Zflag, PC_Update, SRam_R, SRam_W,Cflag,opcode, StackRead, StackWrite, ALU_Save,ZFlag_Save,CFlag_Save,INportRead, OutportWrite, RegfileRead, Regfilewrite);
 input clk, Reset, T1, T2, T3, T4, Zflag, Cflag;
@@ -195,6 +200,7 @@ Mux_32to1withE inst28(I9, opcode,T3, StackWrite);
 Mux_32to1withE inst29(I10, opcode,T3, StackRead);
 Mux_32to1withE inst30(I11, opcode,T3, INportRead);
 Mux_32to1withE inst31(I12, opcode,T4, PC_Update);
+
 endmodule
 module decoder4to16_withE_method1(A, E, D);
   input [3:0]A;			// 4-bit input
@@ -247,23 +253,22 @@ module decoder4to16_withE_method1(A, E, D);
 endmodule
 
 // register
-module eightbitRegwithLoad(clk, Datain, Rst, L, Dataout);
-input clk, L, Rst;
-input [7:0] Datain;
-output reg [7:0] Dataout;
+module eightbitRegwithLoad(
+    input clk,
+    input Rst,
+    input L,               // Changed order to match usage
+    input [7:0] Datain,
+    output reg [7:0] Dataout
+);
+    wire [7:0] Y;
+    assign Y = (L == 1'b1) ? Datain : Dataout;
 
-wire [7:0] Y;
-
-assign Y = (L == 1'b1)? Datain: Dataout; //represents 2to1MUX_8-bit 
-
-//////////with synchronous reset//////////////
-always @(posedge clk)
-	begin
-			if(Rst == 1'b1)
-				Dataout<=8'b0000_0000;
-			else
-				Dataout<=Y;
-	end
+    always @(posedge clk) begin
+        if (Rst)
+            Dataout <= 8'b0000_0000;
+        else
+            Dataout <= Y;
+    end
 endmodule
 ///////////////////////////////////////////////
 
@@ -296,42 +301,62 @@ module mux16to1_8_bit_withoutE(I0, I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11,
     end
 endmodule
 
-module registerfile(Datain, AddressW, AddressR1, AddressR2, R, W, clk, Rst, Dataout1, Dataout2);
-    input [7:0] Datain;
-	input [3:0] AddressR1, AddressR2, AddressW;
-	input R, W, clk, Rst;
+module registerfile(
+    input [7:0] Datain,
+    input [3:0] AddressR1, AddressR2, AddressW,
+    input R, W, clk, Rst,
+    output wire [7:0] Dataout1, Dataout2
+);
+    // Generate write address using decoder
+    wire [15:0] write_address;
+    wire [7:0] read_data_1, read_data_2;
+    
+    decoder4to16_withE_method1 inst32(
+        .A(AddressW),
+        .E(W),
+        .D(write_address)
+    );
 
-	output wire [7:0] Dataout1, Dataout2;
+    // Register array with proper initialization
+    reg [7:0] D [0:15];
+    integer i;
+    initial begin
+        for (i = 0; i < 16; i = i + 1)
+            D[i] = 8'b0;
+    end
 
-	wire[15:0] write_address;
-	decoder4to16_withE_method1 inst32(AddressW, W, write_address);
+    // Write operation
+    always @(posedge clk) begin
+        if (Rst) begin
+            for (i = 0; i < 16; i = i + 1)
+                D[i] <= 8'b0;
+        end
+        else if (W)  // Only write when enabled
+            if (write_address[AddressW])
+                D[AddressW] <= Datain;
+    end
 
-	wire [7:0] D0, D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12, D13, D14, D15;
+    // Read multiplexers
+    assign read_data_1 = (R) ? D[AddressR1] : 8'b0;
+    assign read_data_2 = (R) ? D[AddressR2] : 8'b0;
 
-	eightbitRegwithLoad inst33(clk, Datain, Rst, write_address[0], D0);
-	eightbitRegwithLoad inst34(clk, Datain, Rst, write_address[1], D1);
-	eightbitRegwithLoad inst35(clk, Datain, Rst, write_address[2], D2);
-	eightbitRegwithLoad inst36(clk, Datain, Rst, write_address[3], D3);
-	eightbitRegwithLoad inst37(clk, Datain, Rst, write_address[4], D4);
-	eightbitRegwithLoad inst38(clk, Datain, Rst, write_address[5], D5);
-	eightbitRegwithLoad inst39(clk, Datain, Rst, write_address[6], D6);
-	eightbitRegwithLoad inst40(clk, Datain, Rst, write_address[7], D7);
-	eightbitRegwithLoad inst41(clk, Datain, Rst, write_address[8], D8);
-	eightbitRegwithLoad inst42(clk, Datain, Rst, write_address[9], D9);
-	eightbitRegwithLoad inst43(clk, Datain, Rst, write_address[10], D10);
-	eightbitRegwithLoad inst44(clk, Datain, Rst, write_address[11], D11);
-	eightbitRegwithLoad inst45(clk, Datain, Rst, write_address[12], D12);
-	eightbitRegwithLoad inst46(clk, Datain, Rst, write_address[13], D13);
-	eightbitRegwithLoad inst47(clk, Datain, Rst, write_address[14], D14);
-	eightbitRegwithLoad inst48(clk, Datain, Rst, write_address[15], D15);
+    // Output registers
+    RegisterSynW output_reg1(
+        .clk(clk),
+        .Reset(Rst),
+        .W(R),
+        .Datain(read_data_1),
+        .Dataout(Dataout1)
+    );
 
-	wire [7:0] read_data_1, read_data_2;
+    RegisterSynW output_reg2(
+        .clk(clk),
+        .Reset(Rst),
+        .W(R),
+        .Datain(read_data_2),
+        .Dataout(Dataout2)
+    );
 
-	mux16to1_8_bit_withoutE inst49(D0, D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12, D13, D14, D15, AddressR1, read_data_1);
-	mux16to1_8_bit_withoutE inst50(D0, D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12, D13, D14, D15, AddressR2, read_data_2);
-
-	eightbitRegwithLoad inst51(clk, read_data_1, Rst, R, Dataout1);
-	eightbitRegwithLoad inst52(clk, read_data_2, Rst, R, Dataout2);
 endmodule
 module INPort (
     clk,
@@ -607,48 +632,57 @@ module OUTPort (
     input Reset,
     input [7:0] Address,
     input [7:0] Datain,
-    output reg [7:0] OUTPortWire
+    input OutportWrite,    // Missing write enable
+    output reg [7:0] OUTPortWire1,
+    output reg [7:0] OUTPortWire2,
+    output reg [7:0] OUTPortWire3,
+    output reg [7:0] OUTPortWire4
 );
-
-    wire isAddress1, isAddress2, isAddress3, isAddress4;
-    wire temp1, temp2;
-
-    // Comparators to check specific address matches
-    comparator_unsigned comp1(Address, 8'b1111_1000, temp1, temp2, isAddress1);
-    comparator_unsigned comp2(Address, 8'b1111_1001, temp1, temp2, isAddress2);
-    comparator_unsigned comp3(Address, 8'b1111_1010, temp1, temp2, isAddress3);
-    comparator_unsigned comp4(Address, 8'b1111_1011, temp1, temp2, isAddress4);
-
+    // Fix: Add OutportWrite check
     always @(posedge clk or posedge Reset) begin
-        if (Reset)
-            OUTPortWire <= 8'b0; // Reset output to zero
-        else if (isAddress1)
-            OUTPortWire <= Datain; // Update output when Address matches
-        else if (isAddress2)
-            OUTPortWire <= Datain;
-        else if (isAddress3)
-            OUTPortWire <= Datain;
-        else if (isAddress4)
-            OUTPortWire <= Datain;
+        if (Reset) begin
+            OUTPortWire1 <= 8'b0;
+            OUTPortWire2 <= 8'b0;
+            OUTPortWire3 <= 8'b0;
+            OUTPortWire4 <= 8'b0;
+        end
+        else if (OutportWrite) begin  // Only write when enabled
+            case (Address[1:0])
+                2'b00: OUTPortWire1 <= Datain;
+                2'b01: OUTPortWire2 <= Datain;
+                2'b10: OUTPortWire3 <= Datain;
+                2'b11: OUTPortWire4 <= Datain;
+            endcase
+        end
     end
-
 endmodule
-module Program_Counter(Enable_PC,Reset, Update_PC, clk, New_Address, PC, PC_D2);
-input Enable_PC, Update_PC, clk, Reset;
-input[7:0] New_Address;
-output[7:0] PC;
-output[7:0] PC_D2;
-wire cout,c7;
-wire[7:0] mux1_out;
-wire[7:0] adder_out;
-Mux_2to1 inst62(8'b00000000,8'b00000001,Enable_PC,mux1_out);
-ripple_carry_adder inst63(mux1_out,PC, 1'b0,adder_out,cout,c7);
-wire[7:0] mux2_out;
-Mux_2to1 inst64(adder_out,New_Address,Update_PC,mux2_out);
-RegisterSynW inst65(clk,Reset,1'b1,mux2_out,PC);
-wire[7:0] PC_D1;
-RegisterSynW inst66(clk,Reset,1'b1,PC,PC_D1);
-RegisterSynW inst67(clk,Reset,1'b1,PC_D1,PC_D2);
+module Program_Counter(Enable_PC, Reset, Update_PC, clk, New_Address, PC, PC_D2);
+    input Enable_PC, Update_PC, clk, Reset;
+    input [7:0] New_Address;
+    output [7:0] PC;
+    output [7:0] PC_D2;
+    
+    wire [7:0] mux1_out;
+    wire [7:0] adder_out;
+    
+    // First mux to select between 0 and 1 based on Enable_PC
+    Mux_2to1 inst62(8'b00000000, 8'b00000001, Enable_PC, mux1_out);
+    
+    // Simple addition instead of ripple carry adder
+    assign adder_out = PC + mux1_out;
+    
+    wire [7:0] mux2_out;
+    // Second mux to select between incremented PC and new address
+    Mux_2to1 inst64(adder_out, New_Address, Update_PC, mux2_out);
+    
+    // Program Counter Register
+    RegisterSynW inst65(clk, Reset, 1'b1, mux2_out, PC);
+    
+    // Two stage delay for PC
+    wire [7:0] PC_D1;
+    RegisterSynW inst66(clk, Reset, 1'b1, PC, PC_D1);
+    RegisterSynW inst67(clk, Reset, 1'b1, PC_D1, PC_D2);
+    
 endmodule
 
 
@@ -671,20 +705,17 @@ module RegisterSynW_25bit (
     end
 endmodule
 module RegisterSynW (
-    clk,
-    Reset,
-    W,
-    Datain,
-    Dataout
+    input clk,
+    input Reset,
+    input W,           // Write enable not properly used
+    input [7:0] Datain,
+    output reg [7:0] Dataout
 );
-    input clk, Reset, W;
-    input [7:0] Datain;
-    output reg [7:0] Dataout;
-
+    // Fix: Add write enable check
     always @(posedge clk) begin
         if (Reset)
             Dataout <= 8'b0000_0000;
-        else if (W)
+        else if (W)  // Only update when write is enabled
             Dataout <= Datain;
     end
 endmodule
@@ -697,20 +728,19 @@ module ROM(
     output reg [3:0] Source2,
     output reg [7:0] Imm
 );
-    
     reg [24:0] memory [0:255];
     
     initial begin
         $readmemb("ROM.txt", memory);
     end
     
-    always @(*) begin
+    always @(Address) begin  // Changed from @* to @(Address)
         Dataout = memory[Address];
-        Opcode  = Dataout[24:20];  // First 5 bits (MSB) for Opcode
-        Destin  = Dataout[19:16];  // Next 4 bits for Destination Register
-        Source1 = Dataout[15:12];  // Next 4 bits for Source Register 1
-        Source2 = Dataout[11:8];   // Next 4 bits for Source Register 2
-        Imm     = Dataout[8:0];    // Last 9 bits for Immediate value
+        Opcode  = Dataout[24:20];
+        Destin  = Dataout[19:16];
+        Source1 = Dataout[15:12];
+        Source2 = Dataout[11:8];
+        Imm     = Dataout[7:0];
     end
 endmodule
 module SRAM (
@@ -739,11 +769,8 @@ module SRAM (
     end
 
     // Read operation (Combinational)
-    always @(*) begin
-        if (SRAMRead)
-            Dataout = datamem[Address]; // Reading from memory
-        else
-            Dataout = 8'b00000000; // Giving output as 0 when not reading
+    always @(Address, SRAMRead) begin
+        Dataout = (SRAMRead) ? datamem[Address] : 8'b00000000; // Reading from memory
     end
 
 endmodule
@@ -887,14 +914,14 @@ module eightbitregister(Datain, W, R, Rst, clk, Dataout);
   input W, R, Rst, clk;
   output wire [7:0] Dataout;
   
-  onebitregister inst93(Datain[0], W, R, Rst, Clk, Dataout[0]);
-  onebitregister inst94(Datain[1], W, R, Rst, Clk, Dataout[1]);
-  onebitregister inst95(Datain[2], W, R, Rst, Clk, Dataout[2]);
-  onebitregister inst96(Datain[3], W, R, Rst, Clk, Dataout[3]);
-  onebitregister inst97(Datain[4], W, R, Rst, Clk, Dataout[4]);
-  onebitregister inst99(Datain[5], W, R, Rst, Clk, Dataout[5]);
-  onebitregister inst98(Datain[6], W, R, Rst, Clk, Dataout[6]);
-  onebitregister inst100(Datain[7], W, R, Rst, Clk, Dataout[7]);
+  onebitregister inst93(Datain[0], W, R, Rst, clk, Dataout[0]);
+  onebitregister inst94(Datain[1], W, R, Rst, clk, Dataout[1]);
+  onebitregister inst95(Datain[2], W, R, Rst, clk, Dataout[2]);
+  onebitregister inst96(Datain[3], W, R, Rst, clk, Dataout[3]);
+  onebitregister inst97(Datain[4], W, R, Rst, clk, Dataout[4]);
+  onebitregister inst99(Datain[5], W, R, Rst, clk, Dataout[5]);
+  onebitregister inst98(Datain[6], W, R, Rst, clk, Dataout[6]);
+  onebitregister inst100(Datain[7], W, R, Rst, clk, Dataout[7]);
   
 endmodule
 
@@ -943,4 +970,75 @@ module Mux32to1_8bitRP(
 
     assign { I[31], I[30], I[29], I[28], I[27], I[26], I[25], I[24], I[23], I[22], I[21], I[20], I[19], I[18], I[17], I[16], I[15], I[14], I[13], I[12], I[11], I[10], I[9], I[8], I[7], I[6], I[5], I[4], I[3], I[2], I[1], I[0] } = { I31, I30, I29, I28, I27, I26, I25, I24, I23, I22, I21, I20, I19, I18, I17, I16, I15, I14, I13, I12, I11, I10, I9, I8, I7, I6, I5, I4, I3, I2, I1, I0 };
     assign Y = I[S];
+endmodule
+
+// Add missing module: Mux32to1_1bit_withoutE
+module Mux32to1_1bit_withoutE(
+    input [4:0] S,
+    input [31:0] I,
+    output wire Y
+);
+    assign Y = I[S];  // Direct selection using array indexing
+endmodule
+
+// Add missing module: Mux32to1_8bit
+module Mux32to1_8bit(
+    input [4:0] S,
+    input [7:0] I0, I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15,
+    input [7:0] I16, I17, I18, I19, I20, I21, I22, I23, I24, I25, I26, I27, I28, I29, I30, I31,
+    output reg [7:0] Y
+);
+    always @(*) begin
+        case(S)
+            5'b00000: Y = I0;
+            5'b00001: Y = I1;
+            5'b00010: Y = I2;
+            5'b00011: Y = I3;
+            5'b00100: Y = I4;
+            5'b00101: Y = I5;
+            5'b00110: Y = I6;
+            5'b00111: Y = I7;
+            5'b01000: Y = I8;
+            5'b01001: Y = I9;
+            5'b01010: Y = I10;
+            5'b01011: Y = I11;
+            5'b01100: Y = I12;
+            5'b01101: Y = I13;
+            5'b01110: Y = I14;
+            5'b01111: Y = I15;
+            5'b10000: Y = I16;
+            5'b10001: Y = I17;
+            5'b10010: Y = I18;
+            5'b10011: Y = I19;
+            5'b10100: Y = I20;
+            5'b10101: Y = I21;
+            5'b10110: Y = I22;
+            5'b10111: Y = I23;
+            5'b11000: Y = I24;
+            5'b11001: Y = I25;
+            5'b11010: Y = I26;
+            5'b11011: Y = I27;
+            5'b11100: Y = I28;
+            5'b11101: Y = I29;
+            5'b11110: Y = I30;
+            5'b11111: Y = I31;
+            default: Y = 8'b0;
+        endcase
+    end
+endmodule
+
+// Add missing module: onebitRegwithLoad
+module onebitRegwithLoad(
+    input clk,
+    input Reset,
+    input load,
+    input Datain,
+    output reg Dataout
+);
+    always @(posedge clk) begin
+        if (Reset)
+            Dataout <= 1'b0;
+        else if (load)
+            Dataout <= Datain;
+    end
 endmodule

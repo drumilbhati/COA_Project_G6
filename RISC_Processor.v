@@ -1,3 +1,6 @@
+`include "subcomponents.v"
+`timescale 1ns/100ps
+
 module RISCprocessor(
     input clk,
     input Reset,
@@ -10,7 +13,18 @@ module RISCprocessor(
     output [7:0] OutExtWorld3,
     output [7:0] OutExtWorld4
 );
+    // Fix signal declarations - remove duplicates
     wire [7:0] RegDataout1, RegDataout2, RegDatain;
+    wire RegfileRead, Regfilewrite;
+    wire PCupdate;
+    wire [7:0] InDataout;
+
+    // Control signals - single declaration
+    wire PC_Update, SRAMRead, SRAMWrite;
+    wire StackRead, StackWrite, INportRead;
+    wire OutportWrite;  // Fix naming consistency
+    wire [7:0] OutAddress;
+
     // * instruction memory
     wire [4:0] Opcode;
     wire [3:0] Source1, Source2, Destin;
@@ -32,29 +46,26 @@ module RISCprocessor(
     // * PC
     wire [7:0] PCAddress, PC, PC_D2;
 
-    // * In Ports
-    wire [7:0] InAddress, InDataout;
-
-    // * Out Ports
-    wire [7:0] OutAddress, OutDatain;
+    // * In/Out Ports
+    wire [7:0] InAddress;
 
     // * Control Logic
-    wire PCupdate, ALUSave, ZflagSave, CflagSave;
-    wire SRAMRead, SRAMWrite, StackRead, StackWrite, INportRead, OUTportWrite, RegFileRead, RegFileWrite;
+    wire ALUSave, ZflagSave, CflagSave;
 
     // * flags
-    wire Zflag, Cflag;;
-     TimingGen TimingGenInst(
-        clk,
-        Reset,
-        T0,
-        T1,
-        T2,
-        T3,
-        T4
+    wire Zflag, Cflag;
+
+    TimingGen TimingGenInst(
+        .clk(clk),
+        .Reset(Reset),
+        .T0(T0),
+        .T1(T1),
+        .T2(T2),
+        .T3(T3),
+        .T4(T4)
     );
 
-        // * Program Counter:
+    // * Program Counter:
     Mux32to1_8bitRP Mux32to1_8bit_PCInst(
         Opcode,
         PC,
@@ -91,18 +102,18 @@ module RISCprocessor(
         PC,
         PCAddress
     );
-    
+
     // Instantiate modules
     Program_Counter PC_Module(
         .clk(clk),
         .Reset(Reset),
         .Enable_PC(T0),
-        .Update_PC(PCupdate),
+        .Update_PC(PC_Update),  // Fix signal name
         .New_Address(PCAddress),
         .PC(PC),
         .PC_D2(PC_D2)
     );
-    
+
     Instruction_Memory Inst_Memory(
         .clk(clk),
         .Reset(Reset),
@@ -115,6 +126,7 @@ module RISCprocessor(
         .Source2(Source2),
         .Imm(Imm)
     );
+
     // * Register File
     Mux32to1_8bitRP Mux32to1_8bit_RegInst(
         Opcode,
@@ -152,8 +164,7 @@ module RISCprocessor(
         RegDatain,
         RegDatain
     );
-    
-    
+
     registerfile Reg_File(
         .clk(clk),
         .Rst(Reset),
@@ -166,7 +177,8 @@ module RISCprocessor(
         .Dataout1(RegDataout1),
         .Dataout2(RegDataout2)
     );
-     // * ALU
+
+    // * ALU
     Mux32to1_8bitRP Mux32to1_8bit_ALU_OP1Inst(
         Opcode,
         8'b0,
@@ -203,6 +215,7 @@ module RISCprocessor(
         8'b0,
         Operand1
     );
+
     Mux32to1_8bitRP Mux32to1_8bit_ALU_OP2Inst(
         Opcode,
         8'b0,
@@ -239,20 +252,21 @@ module RISCprocessor(
         8'b0,
         Operand2
     );
-   
+
     ALU ALU_Module(
         .clk(clk),
         .Reset(Reset),
+        .ALUSave(ALUSave),      // Changed order to match module definition
         .Imm7(Imm[7]),
-        .Op1(RegDataout1),
-        .Op2(RegDataout2),
-        .OpCode(Opcode),
-        .ZFlag_Save(ZflagSave),
-        .CFlag_Save(CflagSave),
-        .ALU_Save(ALUout)
+        .OpCode(Opcode),        // Fixed capitalization
+        .Op1(Operand1),
+        .Op2(Operand2),
+        .Zflag(Zflag),         // Added outputs
+        .Cflag(Cflag),         // Added outputs
+        .ALUout(ALUout)        // Changed from ALU_Save to ALUout
     );
-    
-     // * SRAM
+
+    // * SRAM
     Mux32to1_8bitRP Mux32to1_8bit_SRAMInst(
         Opcode,
         SRAMAddress,
@@ -289,25 +303,29 @@ module RISCprocessor(
         SRAMAddress,
         SRAMAddress
     );
+
     SRAM SRAM_Inst(
-        clk, 
-        Reset, 
-        SRAMAddress, 
-        SRAMRead, 
-        SRAMWrite, 
-        ALUout, 
-        SRAMDataout
+        .clk(clk),
+        .Reset(Reset),
+        .Address(SRAMAddress),     // Changed from SRAMAddress to Address
+        .SRAMRead(SRAMRead),
+        .SRAMWrite(SRAMWrite),
+        .Datain(ALUout),
+        .Dataout(SRAMDataout)
     );
-   
+
     Control_Logic Ctrl_Logic(
         .clk(clk),
         .Reset(Reset),
-        .T1(1'b1), .T2(1'b1), .T3(1'b1), .T4(1'b1),
+        .T1(T1), 
+        .T2(T2), 
+        .T3(T3), 
+        .T4(T4),
         .Zflag(Zflag),
         .Cflag(Cflag),
         .opcode(Opcode),
         .PC_Update(PC_Update),
-        .SRam_R(SRamRead),
+        .SRam_R(SRAMRead),
         .SRam_W(SRAMWrite),
         .StackRead(StackRead),
         .StackWrite(StackWrite),
@@ -319,7 +337,7 @@ module RISCprocessor(
         .RegfileRead(RegfileRead),
         .Regfilewrite(Regfilewrite)
     );
-    
+
     INPort Input_Module(
         .clk(clk),
         .Reset(Reset),
@@ -327,26 +345,30 @@ module RISCprocessor(
         .InpExtWorld1(InpExtWorld1),
         .InpExtWorld2(InpExtWorld2),
         .InpExtWorld3(InpExtWorld3),
-        .InpExtWorld4(InpExtWorld4)
+        .InpExtWorld4(InpExtWorld4),
+        .Address(InAddress),
+        .Dataout(InDataout)
     );
-    
+
     OUTPort Output_Module(
         .clk(clk),
         .Reset(Reset),
-        .OUTportWrite(OutPortWrite),
+        .Address(OutAddress),
         .Datain(ALUout),
-        .OutExtWorld1(OutExtWorld1),
-        .OutExtWorld2(OutExtWorld2),
-        .OutExtWorld3(OutExtWorld3),
-        .OutExtWorld4(OutExtWorld4)
+        .OutportWrite(OutportWrite),
+        .OUTPortWire1(OutExtWorld1),
+        .OUTPortWire2(OutExtWorld2),
+        .OUTPortWire3(OutExtWorld3),
+        .OUTPortWire4(OutExtWorld4)
     );
-     Stack Stack(
-        clk, 
-        Reset, 
-        StackRead, 
-        StackWrite, 
-        ALUout, 
-        StackDataout
+
+    Stack Stack(
+        .clk(clk),
+        .Reset(Reset),
+        .StackRead(StackRead),
+        .StackWrite(StackWrite),
+        .Datain(ALUout),
+        .Dataout(StackDataout)
     );
 
 endmodule
