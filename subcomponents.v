@@ -16,7 +16,21 @@ module decoder3to8_withoutE(A,D);
   
 endmodule
 
-// Dataflow modelling_02 //
+module mux4to1_8bit (
+    input [1:0] S,
+    input [7:0] I0,
+    input [7:0] I1,
+    input [7:0] I2,
+    input [7:0] I3,
+    output [7:0] Y
+);
+
+    assign Y = (S == 2'b00) ? I0 :
+               (S == 2'b01) ? I1 :
+               (S == 2'b10) ? I2 :
+                              I3;
+
+endmodule
 module mux8to1_withoutE(I,S,Y);
   input [2:0] S;
   input [7:0] I;
@@ -161,7 +175,7 @@ module ALU(
         Zflag);
 
 endmodule
-module Control_Logic(clk, Reset, T1, T2, T3, T4, Zflag, PC_Update, SRam_R, SRam_W,Cflag,opcode, StackRead, StackWrite, ALU_Save,ZFlag_Save,CFlag_Save,INportRead, OutportWrite, RegfileRead, Regfilewrite);
+module ControlLogic(clk, Reset, T1, T2, T3, T4, Zflag, PC_Update, SRam_R, SRam_W, Cflag, opcode, StackRead, StackWrite, ALU_Save,ZFlag_Save,CFlag_Save,INportRead, OutportWrite, RegfileRead, Regfilewrite);
 input clk, Reset, T1, T2, T3, T4, Zflag, Cflag;
 input wire [4:0] opcode;
 output wire StackRead, StackWrite, ALU_Save, ZFlag_Save, CFlag_Save, INportRead, OutportWrite, RegfileRead, Regfilewrite, PC_Update, SRam_R, SRam_W;
@@ -409,11 +423,11 @@ end
 
     Mux_4to1 inst61(InPort1Dout, InPort2Dout, InPort3Dout, InPort4Dout, portSel_reg, Dataout);
 endmodule
-module Instruction_Memory(
+module InstMEM(
     input clk,
     input Reset,
     input [7:0] Address,
-    input instRead,
+    input InstRead,
     output reg [24:0] Dataout,
     output reg [4:0] opcode,
     output reg [3:0] Destin, Source1, Source2,
@@ -443,7 +457,7 @@ module Instruction_Memory(
             Source1 <= 4'b0;
             Source2 <= 4'b0;
             Imm     <= 9'b0;
-        end else if (instRead) begin
+        end else if (InstRead) begin
             Dataout <= rom_out;
             opcode  <= rom_opcode;
             Destin  <= rom_Destin;
@@ -656,24 +670,24 @@ module OUTPort (
         end
     end
 endmodule
-module Program_Counter(Enable_PC, Reset, Update_PC, clk, New_Address, PC, PC_D2);
-    input Enable_PC, Update_PC, clk, Reset;
-    input [7:0] New_Address;
+module ProgCounter(PCenable, Reset, PCupdate, clk, CAddress, PC, PC_D2);
+    input PCenable, PCupdate, clk, Reset;
+    input [7:0] CAddress;
     output [7:0] PC;
     output [7:0] PC_D2;
     
     wire [7:0] mux1_out;
     wire [7:0] adder_out;
     
-    // First mux to select between 0 and 1 based on Enable_PC
-    Mux_2to1 inst62(8'b00000000, 8'b00000001, Enable_PC, mux1_out);
+    // First mux to select between 0 and 1 based on PCenable
+    Mux_2to1 inst62(8'b00000000, 8'b00000001, PCenable, mux1_out);
     
     // Simple addition instead of ripple carry adder
     assign adder_out = PC + mux1_out;
     
     wire [7:0] mux2_out;
     // Second mux to select between incremented PC and new address
-    Mux_2to1 inst64(adder_out, New_Address, Update_PC, mux2_out);
+    Mux_2to1 inst64(adder_out, CAddress, PCupdate, mux2_out);
     
     // Program Counter Register
     RegisterSynW inst65(clk, Reset, 1'b1, mux2_out, PC);
@@ -775,46 +789,70 @@ module SRAM (
 
 endmodule
 module Stack (
-    input clk,                
-    input Reset,              // Synchronous Reset
-    input StackRead,          
-    input StackWrite,         
-    input [7:0] Datain,       
-    output reg [7:0] Dataout  
+    input clk,
+    input Reset,
+    input StackRead,
+    input StackWrite,
+    input [7:0] Datain,
+    output [7:0] Dataout
 );
 
-    // Declare 256 x 8-bit SRAM memory
-    reg [7:0] datamem [0:255];
+    // Stack pointers
+    reg [7:0] SP;  // Stack Pointer
 
-    // Stack Pointers
-    reg [7:0] SPWritePTR;  // Pointing to top of stack for writing
-    reg [7:0] SPReadPTR;   // Pointing to top of stack for reading
+    wire [7:0] SRAM_Dataout;
+    wire [7:0] mux1_out, mux2_out;
 
-    // Stack Reset
-    integer i;
+    // Incremented and decremented stack pointers
+    wire [7:0] SP_plus1, SP_minus1;
+
+    assign SP_plus1 = SP + 1;
+    assign SP_minus1 = SP - 1;
+
+    // First MUX: Stack Pointer update source (SP, SP+1, SP–1, 0)
+    mux4to1_8bit MUX_SP_Update (
+        .S({StackWrite, StackRead}),  // Priority: Write=2'b10, Read=2'b01
+        .I0(SP),                      // Default hold
+        .I1(SP_minus1),               // On read (pop)
+        .I2(SP_plus1),                // On write (push)
+        .I3(8'b00000000),             // Not used
+        .Y(mux1_out)
+    );
+
+    // SRAM instance
+    SRAM stack_mem (
+        .clk(clk),
+        .Reset(Reset),
+        .Address(SP),
+        .SRAMRead(StackRead),
+        .SRAMWrite(StackWrite),
+        .Datain(Datain),
+        .Dataout(SRAM_Dataout)
+    );
+
+    // Second MUX: SRAM output 
+    mux4to1_8bit MUX_Dataout_Select (
+        .S({1'b0, StackRead}),   // Select line: 2'b01 = Read, 2'b00 = default
+        .I0(8'b00000000),        // Default when not reading
+        .I1(SRAM_Dataout),       // Output from SRAM
+        .I2(8'b00000000),        
+        .I3(8'b00000000),        
+        .Y(mux2_out)
+    );
+
+    // Assign output
+    assign Dataout = mux2_out;
+
+    // Stack Pointer logic
     always @(posedge clk) begin
-        if (Reset) begin
-            for (i = 0; i < 256; i = i + 1)
-                datamem[i] <= 8'b00000000; // Clear memory
-            SPWritePTR <= 8'b00000000; // Reset write pointer
-            SPReadPTR  <= 8'b11111111; // Reset read pointer (Empty stack)
-        end 
-        else if (StackWrite) begin
-            datamem[SPWritePTR] <= Datain; // Push data onto stack
-            SPReadPTR <= SPWritePTR; // Move read pointer to the last written location
-            SPWritePTR <= SPWritePTR + 1; // Increment write pointer
-        end
-    end
-
-    // Read operation
-    always @(*) begin
-        if (StackRead)
-            Dataout = datamem[SPReadPTR]; // Read from top of stack
+        if (Reset)
+            SP <= 8'b11111111;  // Stack empty
         else
-            Dataout = 8'b00000000; //Returning 0 when not reading
+            SP <= mux1_out;
     end
 
 endmodule
+
 module TimingGen(
     input clk,
     input Reset,
