@@ -7,7 +7,7 @@ module RISCprocessor_tb;
     reg [7:0] InpExtWorld1, InpExtWorld2, InpExtWorld3, InpExtWorld4;
     wire [7:0] OutExtWorld1, OutExtWorld2, OutExtWorld3, OutExtWorld4;
 
-    // Debug signals
+    
     wire [7:0] PC;
     wire [24:0] Instruction;
     wire [4:0] Opcode;
