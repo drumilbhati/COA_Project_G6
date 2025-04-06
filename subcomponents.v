@@ -769,7 +769,7 @@ module SRAM (
     end
 
     // Read operation (Combinational)
-    always @(Address, SRAMRead) begin
+    always @(SRAMRead, posedge clk) begin
         Dataout = (SRAMRead) ? datamem[Address] : 8'b00000000; // Reading from memory
     end
 

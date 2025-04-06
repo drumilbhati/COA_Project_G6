@@ -140,7 +140,7 @@ module RISCprocessor(
         ALUout,
         RegDatain,
         SRAMDataout,
-        RegDatain,
+        8'b0,
         InDataout,
         StackDataout,
         RegDatain,
@@ -346,15 +346,15 @@ module RISCprocessor(
         .InpExtWorld2(InpExtWorld2),
         .InpExtWorld3(InpExtWorld3),
         .InpExtWorld4(InpExtWorld4),
-        .Address(InAddress),
+        .Address(Imm),
         .Dataout(InDataout)
     );
 
     OUTPort Output_Module(
         .clk(clk),
         .Reset(Reset),
-        .Address(OutAddress),
-        .Datain(ALUout),
+        .Address(Imm),
+        .Datain(RegDataout1),
         .OutportWrite(OutportWrite),
         .OUTPortWire1(OutExtWorld1),
         .OUTPortWire2(OutExtWorld2),

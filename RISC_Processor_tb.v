@@ -36,7 +36,7 @@ module RISCprocessor_tb;
         // Initialize signals
         clk = 1'b0;
         Reset = 1'b1;
-        InpExtWorld1 = 8'h00;
+        InpExtWorld1 = 8'h8B;
         InpExtWorld2 = 8'h00;
         InpExtWorld3 = 8'h00;
         InpExtWorld4 = 8'h00;
