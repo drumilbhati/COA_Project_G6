@@ -104,21 +104,21 @@ module RISCprocessor(
     );
 
     // Instantiate modules
-    Program_Counter PC_Module(
+    ProgCounter PC_Module(
         .clk(clk),
         .Reset(Reset),
-        .Enable_PC(T0),
-        .Update_PC(PC_Update),  // Fix signal name
-        .New_Address(PCAddress),
+        .PCenable(T0),
+        .PCupdate(PC_Update),  // Fix signal name
+        .CAddress(PCAddress),
         .PC(PC),
         .PC_D2(PC_D2)
     );
 
-    Instruction_Memory Inst_Memory(
+    InstMEM Inst_Memory(
         .clk(clk),
         .Reset(Reset),
         .Address(PC),
-        .instRead(T0),
+        .InstRead(T0),
         .Dataout(currentInstruction),
         .opcode(Opcode),
         .Destin(Destin),
@@ -314,7 +314,7 @@ module RISCprocessor(
         .Dataout(SRAMDataout)
     );
 
-    Control_Logic Ctrl_Logic(
+    ControlLogic Ctrl_Logic(
         .clk(clk),
         .Reset(Reset),
         .T1(T1), 

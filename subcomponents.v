@@ -175,7 +175,7 @@ module ALU(
         Zflag);
 
 endmodule
-module Control_Logic(clk, Reset, T1, T2, T3, T4, Zflag, PC_Update, SRam_R, SRam_W,Cflag,opcode, StackRead, StackWrite, ALU_Save,ZFlag_Save,CFlag_Save,INportRead, OutportWrite, RegfileRead, Regfilewrite);
+module ControlLogic(clk, Reset, T1, T2, T3, T4, Zflag, PC_Update, SRam_R, SRam_W, Cflag, opcode, StackRead, StackWrite, ALU_Save,ZFlag_Save,CFlag_Save,INportRead, OutportWrite, RegfileRead, Regfilewrite);
 input clk, Reset, T1, T2, T3, T4, Zflag, Cflag;
 input wire [4:0] opcode;
 output wire StackRead, StackWrite, ALU_Save, ZFlag_Save, CFlag_Save, INportRead, OutportWrite, RegfileRead, Regfilewrite, PC_Update, SRam_R, SRam_W;
@@ -423,11 +423,11 @@ end
 
     Mux_4to1 inst61(InPort1Dout, InPort2Dout, InPort3Dout, InPort4Dout, portSel_reg, Dataout);
 endmodule
-module Instruction_Memory(
+module InstMEM(
     input clk,
     input Reset,
     input [7:0] Address,
-    input instRead,
+    input InstRead,
     output reg [24:0] Dataout,
     output reg [4:0] opcode,
     output reg [3:0] Destin, Source1, Source2,
@@ -457,7 +457,7 @@ module Instruction_Memory(
             Source1 <= 4'b0;
             Source2 <= 4'b0;
             Imm     <= 9'b0;
-        end else if (instRead) begin
+        end else if (InstRead) begin
             Dataout <= rom_out;
             opcode  <= rom_opcode;
             Destin  <= rom_Destin;
@@ -670,24 +670,24 @@ module OUTPort (
         end
     end
 endmodule
-module Program_Counter(Enable_PC, Reset, Update_PC, clk, New_Address, PC, PC_D2);
-    input Enable_PC, Update_PC, clk, Reset;
-    input [7:0] New_Address;
+module ProgCounter(PCenable, Reset, PCupdate, clk, CAddress, PC, PC_D2);
+    input PCenable, PCupdate, clk, Reset;
+    input [7:0] CAddress;
     output [7:0] PC;
     output [7:0] PC_D2;
     
     wire [7:0] mux1_out;
     wire [7:0] adder_out;
     
-    // First mux to select between 0 and 1 based on Enable_PC
-    Mux_2to1 inst62(8'b00000000, 8'b00000001, Enable_PC, mux1_out);
+    // First mux to select between 0 and 1 based on PCenable
+    Mux_2to1 inst62(8'b00000000, 8'b00000001, PCenable, mux1_out);
     
     // Simple addition instead of ripple carry adder
     assign adder_out = PC + mux1_out;
     
     wire [7:0] mux2_out;
     // Second mux to select between incremented PC and new address
-    Mux_2to1 inst64(adder_out, New_Address, Update_PC, mux2_out);
+    Mux_2to1 inst64(adder_out, CAddress, PCupdate, mux2_out);
     
     // Program Counter Register
     RegisterSynW inst65(clk, Reset, 1'b1, mux2_out, PC);
