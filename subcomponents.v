@@ -16,7 +16,21 @@ module decoder3to8_withoutE(A,D);
   
 endmodule
 
-// Dataflow modelling_02 //
+module mux4to1_8bit (
+    input [1:0] S,
+    input [7:0] I0,
+    input [7:0] I1,
+    input [7:0] I2,
+    input [7:0] I3,
+    output [7:0] Y
+);
+
+    assign Y = (S == 2'b00) ? I0 :
+               (S == 2'b01) ? I1 :
+               (S == 2'b10) ? I2 :
+                              I3;
+
+endmodule
 module mux8to1_withoutE(I,S,Y);
   input [2:0] S;
   input [7:0] I;
@@ -775,46 +789,70 @@ module SRAM (
 
 endmodule
 module Stack (
-    input clk,                
-    input Reset,              // Synchronous Reset
-    input StackRead,          
-    input StackWrite,         
-    input [7:0] Datain,       
-    output reg [7:0] Dataout  
+    input clk,
+    input Reset,
+    input StackRead,
+    input StackWrite,
+    input [7:0] Datain,
+    output [7:0] Dataout
 );
 
-    // Declare 256 x 8-bit SRAM memory
-    reg [7:0] datamem [0:255];
+    // Stack pointers
+    reg [7:0] SP;  // Stack Pointer
 
-    // Stack Pointers
-    reg [7:0] SPWritePTR;  // Pointing to top of stack for writing
-    reg [7:0] SPReadPTR;   // Pointing to top of stack for reading
+    wire [7:0] SRAM_Dataout;
+    wire [7:0] mux1_out, mux2_out;
 
-    // Stack Reset
-    integer i;
+    // Incremented and decremented stack pointers
+    wire [7:0] SP_plus1, SP_minus1;
+
+    assign SP_plus1 = SP + 1;
+    assign SP_minus1 = SP - 1;
+
+    // First MUX: Stack Pointer update source (SP, SP+1, SP–1, 0)
+    mux4to1_8bit MUX_SP_Update (
+        .S({StackWrite, StackRead}),  // Priority: Write=2'b10, Read=2'b01
+        .I0(SP),                      // Default hold
+        .I1(SP_minus1),               // On read (pop)
+        .I2(SP_plus1),                // On write (push)
+        .I3(8'b00000000),             // Not used
+        .Y(mux1_out)
+    );
+
+    // SRAM instance
+    SRAM stack_mem (
+        .clk(clk),
+        .Reset(Reset),
+        .Address(SP),
+        .SRAMRead(StackRead),
+        .SRAMWrite(StackWrite),
+        .Datain(Datain),
+        .Dataout(SRAM_Dataout)
+    );
+
+    // Second MUX: SRAM output 
+    mux4to1_8bit MUX_Dataout_Select (
+        .S({1'b0, StackRead}),   // Select line: 2'b01 = Read, 2'b00 = default
+        .I0(8'b00000000),        // Default when not reading
+        .I1(SRAM_Dataout),       // Output from SRAM
+        .I2(8'b00000000),        
+        .I3(8'b00000000),        
+        .Y(mux2_out)
+    );
+
+    // Assign output
+    assign Dataout = mux2_out;
+
+    // Stack Pointer logic
     always @(posedge clk) begin
-        if (Reset) begin
-            for (i = 0; i < 256; i = i + 1)
-                datamem[i] <= 8'b00000000; // Clear memory
-            SPWritePTR <= 8'b00000000; // Reset write pointer
-            SPReadPTR  <= 8'b11111111; // Reset read pointer (Empty stack)
-        end 
-        else if (StackWrite) begin
-            datamem[SPWritePTR] <= Datain; // Push data onto stack
-            SPReadPTR <= SPWritePTR; // Move read pointer to the last written location
-            SPWritePTR <= SPWritePTR + 1; // Increment write pointer
-        end
-    end
-
-    // Read operation
-    always @(*) begin
-        if (StackRead)
-            Dataout = datamem[SPReadPTR]; // Read from top of stack
+        if (Reset)
+            SP <= 8'b11111111;  // Stack empty
         else
-            Dataout = 8'b00000000; //Returning 0 when not reading
+            SP <= mux1_out;
     end
 
 endmodule
+
 module TimingGen(
     input clk,
     input Reset,
